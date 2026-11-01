@@ -10,21 +10,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download AutoHotkey v2 (official release)
+      - name: Install AutoHotkey v2 (official installer)
         shell: pwsh
         run: |
           $rel = Invoke-RestMethod "https://api.github.com/repos/AutoHotkey/AutoHotkey/releases/latest"
-          $asset = $rel.assets | Where-Object { $_.name -match '^AutoHotkey_2\.[\d\.]+\.zip$' } | Select-Object -First 1
+          $asset = $rel.assets | Where-Object { $_.name -match '^AutoHotkey_2\.[\d\.]+_setup\.exe$' } | Select-Object -First 1
           Write-Host "Downloading $($asset.name)"
-          Invoke-WebRequest $asset.browser_download_url -OutFile ahk.zip
-          Expand-Archive ahk.zip -DestinationPath ahk
+          Invoke-WebRequest $asset.browser_download_url -OutFile ahk_setup.exe
+          Start-Process -FilePath .\ahk_setup.exe -ArgumentList "/silent" -Wait
 
       - name: Compile to EXE
         shell: pwsh
         run: |
-          $compiler = Get-ChildItem ahk -Recurse -Filter Ahk2Exe.exe | Select-Object -First 1
-          $base = Get-ChildItem ahk -Recurse -Filter AutoHotkey64.exe | Where-Object { $_.FullName -notmatch 'Compiler' } | Select-Object -First 1
-          if (-not $compiler) { Write-Error "Ahk2Exe.exe not found"; exit 1 }
+          $root = "C:\Program Files\AutoHotkey"
+          $compiler = Get-ChildItem $root -Recurse -Filter Ahk2Exe.exe | Select-Object -First 1
+          $base = Get-ChildItem $root -Filter AutoHotkey64.exe | Select-Object -First 1
+          if (-not $base) { $base = Get-ChildItem $root -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1 }
+          if (-not $compiler) { Get-ChildItem $root -Recurse | Select-Object FullName; Write-Error "Ahk2Exe.exe not found"; exit 1 }
           if (-not $base) { Write-Error "AutoHotkey64.exe not found"; exit 1 }
           Write-Host "Compiler: $($compiler.FullName)"
           Write-Host "Base: $($base.FullName)"
