@@ -10,33 +10,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install AutoHotkey v2 (official installer)
+      - name: Download AutoHotkey v2 and Ahk2Exe
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $rel = Invoke-RestMethod "https://api.github.com/repos/AutoHotkey/AutoHotkey/releases/latest"
-          $asset = $rel.assets | Where-Object { $_.name -match '^AutoHotkey_2\.[\d\.]+_setup\.exe$' } | Select-Object -First 1
-          Write-Host "Downloading $($asset.name)"
-          Invoke-WebRequest $asset.browser_download_url -OutFile ahk_setup.exe
-          $proc = Start-Process -FilePath .\ahk_setup.exe -ArgumentList "/silent" -Wait -PassThru
-          Write-Host "Installer exit code: $($proc.ExitCode)"
-          Start-Sleep -Seconds 5
-          Get-ChildItem "C:\Program Files", "C:\Program Files (x86)" -Filter "AutoHotkey*" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $($_.FullName)" }
-          Get-ChildItem C:\ -Recurse -Filter Ahk2Exe.exe -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Ahk2Exe: $($_.FullName)" }
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN" }
+          $ahk = Invoke-RestMethod "https://api.github.com/repos/AutoHotkey/AutoHotkey/releases/latest" -Headers $h
+          $a = $ahk.assets | Where-Object { $_.name -match '^AutoHotkey_2\.[\d\.]+\.zip$' } | Select-Object -First 1
+          Write-Host "AHK: $($a.name)"
+          Invoke-WebRequest $a.browser_download_url -OutFile ahk.zip
+          Expand-Archive ahk.zip -DestinationPath ahk
+
+          $cmp = Invoke-RestMethod "https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest" -Headers $h
+          $c = $cmp.assets | Where-Object { $_.name -match '\.zip$' } | Select-Object -First 1
+          Write-Host "Ahk2Exe: $($c.name)"
+          Invoke-WebRequest $c.browser_download_url -OutFile ahk2exe.zip
+          Expand-Archive ahk2exe.zip -DestinationPath ahk2exe
 
       - name: Compile to EXE
         shell: pwsh
         run: |
-          $root = "C:\Program Files\AutoHotkey"
-          if (-not (Test-Path $root)) { $root = "C:\Program Files\AutoHotkey" }
-          $compiler = Get-ChildItem $root -Recurse -Filter Ahk2Exe.exe | Select-Object -First 1
-          $base = Get-ChildItem $root -Filter AutoHotkey64.exe | Select-Object -First 1
-          if (-not $base) { $base = Get-ChildItem $root -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1 }
-          if (-not $compiler) { Get-ChildItem $root -Recurse | Select-Object FullName; Write-Error "Ahk2Exe.exe not found"; exit 1 }
+          $compiler = Get-ChildItem ahk2exe -Recurse -Filter Ahk2Exe.exe | Select-Object -First 1
+          $base = Get-ChildItem ahk -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1
+          if (-not $compiler) { Write-Error "Ahk2Exe.exe not found"; exit 1 }
           if (-not $base) { Write-Error "AutoHotkey64.exe not found"; exit 1 }
           Write-Host "Compiler: $($compiler.FullName)"
           Write-Host "Base: $($base.FullName)"
-          & $compiler.FullName /in middle.ahk /out MiddleButton.exe /base $base.FullName
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $p = Start-Process -FilePath $compiler.FullName -ArgumentList "/in `"$PWD\middle.ahk`" /out `"$PWD\MiddleButton.exe`" /base `"$($base.FullName)`" /silent verbose" -Wait -PassThru -NoNewWindow
+          Write-Host "Ahk2Exe exit code: $($p.ExitCode)"
           if (-not (Test-Path MiddleButton.exe)) { Write-Error "EXE was not created"; exit 1 }
 
       - uses: actions/upload-artifact@v4
