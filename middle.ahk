@@ -1,11 +1,28 @@
-# Middle Button Remap (Windows)
+﻿#Requires AutoHotkey v2.0
+#SingleInstance Force
 
-أداة بسيطة بتخلّي الزر الأوسط (عجلة الماوس) ينفذ **Backspace** أو **Enter** حسب اختيارك.
+iniFile := A_ScriptDir "\mouse.ini"
+action := IniRead(iniFile, "Settings", "Action", "{Backspace}")
 
-## المتطلبات
-- ويندوز
-- AutoHotkey v2 من autohotkey.com
+MyGui := Gui("+AlwaysOnTop", "زر الماوس الأوسط")
+MyGui.SetFont("s12")
+MyGui.Add("Text",, "اختار الأكشن للزر الأوسط:")
+rbBack  := MyGui.Add("Radio", "Checked", "Backspace")
+rbEnter := MyGui.Add("Radio", , "Enter")
+if (action = "{Enter}")
+    rbEnter.Value := 1
+MyGui.Add("Button", "Default w120", "حفظ").OnEvent("Click", SaveChoice)
+MyGui.OnEvent("Close", (*) => MyGui.Hide())
 
-## التشغيل
-1. دبل كليك على middle.ahk واختار الأكشن واضغط حفظ.
-2. عشان تشتغل مع الويندوز: Win + R ← اكتب shell:startup ← حط فيه اختصار للملف بالوسيط silent.
+; الواجهة بتظهر بس لو الملف اتفتح بالدبل كليك، مش لما يشتغل مع الويندوز
+if !(A_Args.Length && A_Args[1] = "silent")
+    MyGui.Show()
+
+SaveChoice(*) {
+    global action, iniFile, rbEnter, MyGui
+    action := rbEnter.Value ? "{Enter}" : "{Backspace}"
+    IniWrite(action, iniFile, "Settings", "Action")
+    MyGui.Hide()
+}
+
+MButton:: Send(action)
