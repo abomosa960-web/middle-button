@@ -17,12 +17,17 @@ jobs:
           $asset = $rel.assets | Where-Object { $_.name -match '^AutoHotkey_2\.[\d\.]+_setup\.exe$' } | Select-Object -First 1
           Write-Host "Downloading $($asset.name)"
           Invoke-WebRequest $asset.browser_download_url -OutFile ahk_setup.exe
-          Start-Process -FilePath .\ahk_setup.exe -ArgumentList "/silent" -Wait
+          $proc = Start-Process -FilePath .\ahk_setup.exe -ArgumentList "/silent" -Wait -PassThru
+          Write-Host "Installer exit code: $($proc.ExitCode)"
+          Start-Sleep -Seconds 5
+          Get-ChildItem "C:\Program Files", "C:\Program Files (x86)" -Filter "AutoHotkey*" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+          Get-ChildItem C:\ -Recurse -Filter Ahk2Exe.exe -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Ahk2Exe: $($_.FullName)" }
 
       - name: Compile to EXE
         shell: pwsh
         run: |
           $root = "C:\Program Files\AutoHotkey"
+          if (-not (Test-Path $root)) { $root = "C:\Program Files\AutoHotkey" }
           $compiler = Get-ChildItem $root -Recurse -Filter Ahk2Exe.exe | Select-Object -First 1
           $base = Get-ChildItem $root -Filter AutoHotkey64.exe | Select-Object -First 1
           if (-not $base) { $base = Get-ChildItem $root -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1 }
