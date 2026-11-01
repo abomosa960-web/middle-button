@@ -1,0 +1,27 @@
+name: Build EXE
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AutoHotkey v2
+        run: choco install autohotkey -y --no-progress
+
+      - name: Compile to EXE
+        shell: pwsh
+        run: |
+          & "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" `
+            /in middle.ahk `
+            /out MiddleButton.exe `
+            /base "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MiddleButton
+          path: MiddleButton.exe
